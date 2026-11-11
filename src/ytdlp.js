@@ -16,6 +16,32 @@ const DOWNLOADS_DIR = IS_SERVERLESS
 
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 
+const COOKIES_PATH = path.join(os.tmpdir(), 'mediasaver-yt-cookies.txt');
+
+/**
+ * Build optional runtime flags for yt-dlp (IPv4 consistency, cookies secret, proxy)
+ */
+function getExtraYtdlpArgs() {
+  const extra = ['--force-ipv4'];
+
+  const cookiesRaw = process.env.YT_COOKIES_B64
+    ? Buffer.from(process.env.YT_COOKIES_B64, 'base64').toString('utf8')
+    : process.env.YT_COOKIES;
+
+  if (cookiesRaw && cookiesRaw.trim()) {
+    try {
+      fs.writeFileSync(COOKIES_PATH, cookiesRaw, { mode: 0o600 });
+      extra.push('--cookies', COOKIES_PATH);
+    } catch (_) {}
+  }
+
+  if (process.env.YT_PROXY && process.env.YT_PROXY.trim()) {
+    extra.push('--proxy', process.env.YT_PROXY.trim());
+  }
+
+  return extra;
+}
+
 function detectPlatform(rawUrl) {
   let host = '';
   try {
@@ -46,7 +72,12 @@ function sanitizeFilename(name) {
 function extractYtdlpError(stderr) {
   const lines = stderr.split('\n').filter(l => l.includes('ERROR:'));
   if (!lines.length) return null;
-  return lines[0].replace(/^ERROR:\s*\[[^\]]+\]\s*[^:]*:\s*/, '').trim();
+  let msg = lines[0].replace(/^ERROR:\s*\[[^\]]+\]\s*[^:]*:\s*/, '').trim();
+  const hasCookies = Boolean(process.env.YT_COOKIES_B64 || process.env.YT_COOKIES);
+  if (!hasCookies && /403:\s*Forbidden|Sign in to confirm/i.test(stderr)) {
+    msg += ' — YouTube blocked this cloud server IP. Set YT_COOKIES_B64 in Fly.io secrets (or run locally).';
+  }
+  return msg;
 }
 
 function getInfoYtdlp(url) {
@@ -54,6 +85,7 @@ function getInfoYtdlp(url) {
     const args = [
       '--js-runtimes', 'node',
       '--remote-components', 'ejs:github',
+      ...getExtraYtdlpArgs(),
       '--dump-single-json',
       '--no-download',
       '--no-playlist',
@@ -150,10 +182,7 @@ async function download(url, format = 'audio', quality = '720', onProgress) {
   return downloadYtdlp(url, format, quality, onProgress);
 }
 
-/**
- * Search YouTube by track query ("ytsearch1:Artist - Title") and save as MP3
- */
-function downloadAudioSearch(searchQuery, safeBaseName, outputDir = DOWNLOADS_DIR, onProgress) {
+function runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, clientArgs, onProgress) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
@@ -165,6 +194,8 @@ function downloadAudioSearch(searchQuery, safeBaseName, outputDir = DOWNLOADS_DI
     const args = [
       '--js-runtimes', 'node',
       '--remote-components', 'ejs:github',
+      ...getExtraYtdlpArgs(),
+      ...clientArgs,
       '--no-playlist',
       '--format', 'bestaudio[ext=m4a]/bestaudio/best',
       '-x',
@@ -192,6 +223,12 @@ function downloadAudioSearch(searchQuery, safeBaseName, outputDir = DOWNLOADS_DI
     proc.on('close', (code) => {
       const produced = path.join(outputDir, `${tmpName}.mp3`);
       if (!fs.existsSync(produced)) {
+        // Clean up any partial temp files from failed attempt
+        try {
+          for (const f of fs.readdirSync(outputDir)) {
+            if (f.startsWith(tmpName)) fs.unlinkSync(path.join(outputDir, f));
+          }
+        } catch (_) {}
         return reject(new Error(extractYtdlpError(stderr) || `Audio conversion failed (exit ${code})`));
       }
 
@@ -212,6 +249,25 @@ function downloadAudioSearch(searchQuery, safeBaseName, outputDir = DOWNLOADS_DI
   });
 }
 
+/**
+ * Search YouTube by track query ("ytsearch1:Artist - Title") and save as MP3.
+ * Retries with fallback client if first attempt hits 403.
+ */
+async function downloadAudioSearch(searchQuery, safeBaseName, outputDir = DOWNLOADS_DIR, onProgress) {
+  try {
+    return await runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, [], onProgress);
+  } catch (firstErr) {
+    if (!/403|bot|Sign in/i.test(firstErr.message)) throw firstErr;
+    return await runAudioSearchAttempt(
+      searchQuery,
+      safeBaseName,
+      outputDir,
+      ['--extractor-args', 'youtube:player_client=web_safari'],
+      onProgress
+    );
+  }
+}
+
 function downloadYtdlp(url, format = 'audio', quality = '720', onProgress) {
   return new Promise((resolve, reject) => {
     const platform = detectPlatform(url);
@@ -223,6 +279,7 @@ function downloadYtdlp(url, format = 'audio', quality = '720', onProgress) {
     const args = [
       '--js-runtimes', 'node',
       '--remote-components', 'ejs:github',
+      ...getExtraYtdlpArgs(),
       '--no-playlist',
       '--no-simulate',
       '--print', 'before_dl:__META__:%(uploader)s\t%(title)s',
