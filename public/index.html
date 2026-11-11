@@ -3,8 +3,11 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MediaSaver Spotify, YouTube, Twitter &amp; TikTok</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0e080a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>MediaSaver — Spotify, YouTube, Twitter &amp; TikTok</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -75,7 +78,8 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
           <input type="text" id="search-input"
-            placeholder="Search song or paste Spotify track, playlist, or album link…" autocomplete="off">
+            placeholder="Search song or paste Spotify, YouTube, X, or TikTok link…"
+            autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
           <button type="button" id="paste-btn" class="paste-btn" title="Paste from clipboard">Paste</button>
         </div>
         <button type="submit" id="submit-btn" class="submit-btn">
