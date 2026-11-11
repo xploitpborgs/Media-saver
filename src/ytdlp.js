@@ -21,8 +21,8 @@ const COOKIES_PATH = path.join(os.tmpdir(), 'mediasaver-yt-cookies.txt');
 /**
  * Build optional runtime flags for yt-dlp (IPv4 consistency, cookies secret, proxy)
  */
-function getExtraYtdlpArgs() {
-  const extra = ['--force-ipv4'];
+function getExtraYtdlpArgs(useIpv6 = false) {
+  const extra = [useIpv6 ? '--force-ipv6' : '--force-ipv4'];
 
   const cookiesRaw = process.env.YT_COOKIES_B64
     ? Buffer.from(process.env.YT_COOKIES_B64, 'base64').toString('utf8')
@@ -182,7 +182,7 @@ async function download(url, format = 'audio', quality = '720', onProgress) {
   return downloadYtdlp(url, format, quality, onProgress);
 }
 
-function runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, clientArgs, onProgress) {
+function runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, extraFlags, onProgress) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
@@ -194,10 +194,9 @@ function runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, clientArgs,
     const args = [
       '--js-runtimes', 'node',
       '--remote-components', 'ejs:github',
-      ...getExtraYtdlpArgs(),
-      ...clientArgs,
+      ...extraFlags,
       '--no-playlist',
-      '--format', 'bestaudio[ext=m4a]/bestaudio/best',
+      '--format', 'bestaudio[ext=m4a]/bestaudio/bv*+ba/b/best',
       '-x',
       '--audio-format', 'mp3',
       '--audio-quality', '0',
@@ -223,7 +222,6 @@ function runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, clientArgs,
     proc.on('close', (code) => {
       const produced = path.join(outputDir, `${tmpName}.mp3`);
       if (!fs.existsSync(produced)) {
-        // Clean up any partial temp files from failed attempt
         try {
           for (const f of fs.readdirSync(outputDir)) {
             if (f.startsWith(tmpName)) fs.unlinkSync(path.join(outputDir, f));
@@ -251,20 +249,24 @@ function runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, clientArgs,
 
 /**
  * Search YouTube by track query ("ytsearch1:Artist - Title") and save as MP3.
- * Retries with fallback client if first attempt hits 403.
+ * Tries IPv4 first; falls back to IPv6 (when available on Linux/Fly) if blocked.
  */
 async function downloadAudioSearch(searchQuery, safeBaseName, outputDir = DOWNLOADS_DIR, onProgress) {
   try {
-    return await runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, [], onProgress);
+    return await runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, getExtraYtdlpArgs(false), onProgress);
   } catch (firstErr) {
-    if (!/403|bot|Sign in/i.test(firstErr.message)) throw firstErr;
-    return await runAudioSearchAttempt(
-      searchQuery,
-      safeBaseName,
-      outputDir,
-      ['--extractor-args', 'youtube:player_client=web_safari'],
-      onProgress
-    );
+    if (!/403|bot|Sign in|format is not available|empty/i.test(firstErr.message)) {
+      throw firstErr;
+    }
+    try {
+      return await runAudioSearchAttempt(searchQuery, safeBaseName, outputDir, getExtraYtdlpArgs(true), onProgress);
+    } catch (secondErr) {
+      // Keep the clearer error (don't overwrite with network unreachable on IPv4-only hosts)
+      if (/Network is unreachable|Errno 101|EAI_AGAIN/i.test(secondErr.message)) {
+        throw firstErr;
+      }
+      throw secondErr;
+    }
   }
 }
 
@@ -290,7 +292,7 @@ function downloadYtdlp(url, format = 'audio', quality = '720', onProgress) {
 
     if (isAudio) {
       args.push(
-        '--format', 'bestaudio[ext=m4a]/bestaudio/best',
+        '--format', 'bestaudio[ext=m4a]/bestaudio/bv*+ba/b/best',
         '-x',
         '--audio-format', 'mp3',
         '--audio-quality', '0'
@@ -298,7 +300,7 @@ function downloadYtdlp(url, format = 'audio', quality = '720', onProgress) {
     } else {
       const height = parseInt(quality, 10) || 720;
       args.push(
-        '--format', `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${height}][ext=mp4]/best[height<=${height}]/best`,
+        '--format', `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${height}][ext=mp4]/best[height<=${height}]/bv*+ba/b/best`,
         '--merge-output-format', 'mp4'
       );
     }
