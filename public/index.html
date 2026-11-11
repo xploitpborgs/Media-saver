@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediaSaver Spotify, YouTube, Twitter &amp; TikTok</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+</head>
+
+<body>
+  <div class="app-container">
+    <header class="navbar">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="8 12 12 16 16 12"></polyline>
+          <line x1="12" y1="8" x2="12" y2="16"></line>
+        </svg>
+        <span class="brand-name">Media<span class="highlight">Saver</span></span>
+      </div>
+      <div class="badge-clean">100% Ad-Free &amp; Open</div>
+    </header>
+
+    <main class="hero-section">
+      <!-- Platform Tab Bar: Spotify · YouTube · Twitter · TikTok -->
+      <nav class="tab-nav" role="tablist">
+        <button type="button" class="tab-btn active" data-tab="spotify" role="tab" aria-selected="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M8 14.5c2.5-1 5.5-1 8 0" />
+            <path d="M7 11.5c3-1.5 7-1.5 10 0" />
+            <path d="M6 8.5c4-1.8 8-1.8 12 0" />
+          </svg>
+          Spotify
+        </button>
+        <button type="button" class="tab-btn" data-tab="youtube" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.6 3.6 12 3.6 12 3.6s-7.6 0-9.4.5A3 3 0 0 0 .5 6.2 31.5 31.5 0 0 0 0 12a31.5 31.5 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.8.5 9.4.5 9.4.5s7.6 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.5 31.5 0 0 0 24 12a31.5 31.5 0 0 0-.5-5.8z" />
+            <polygon fill="#180f13" points="9.6 15.6 15.8 12 9.6 8.4 9.6 15.6" />
+          </svg>
+          YouTube
+        </button>
+        <button type="button" class="tab-btn" data-tab="twitter" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </svg>
+          Twitter
+        </button>
+        <button type="button" class="tab-btn" data-tab="tiktok" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.75a8.19 8.19 0 0 0 4.79 1.53V6.84a4.85 4.85 0 0 1-1.02-.15z" />
+          </svg>
+          TikTok
+        </button>
+      </nav>
+
+      <h1 class="hero-title" id="hero-title">Spotify Downloader</h1>
+      <p class="hero-subtitle" id="hero-subtitle">Paste any Spotify track, playlist, or album link or search by song
+        name. Direct 320kbps MP3s without popups or limits.</p>
+
+      <form id="search-form" class="search-box">
+        <div class="input-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="search-input"
+            placeholder="Search song or paste Spotify track, playlist, or album link…" autocomplete="off">
+          <button type="button" id="paste-btn" class="paste-btn" title="Paste from clipboard">Paste</button>
+        </div>
+        <button type="submit" id="submit-btn" class="submit-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Fetch</span>
+        </button>
+      </form>
+
+      <div id="status-card" class="status-card hidden"></div>
+
+      <!-- Spotify Results (Track / Playlist / Album / Search) -->
+      <div id="results-container" class="results-container hidden">
+        <div class="collection-header hidden" id="collection-header"></div>
+        <div class="track-list" id="track-list"></div>
+      </div>
+
+      <!-- Social / Video Media Card + Progress (YouTube / Twitter / TikTok / 1700+ sites) -->
+      <div id="media-card" class="media-card hidden">
+        <div class="media-thumb-wrap">
+          <img id="media-thumb" src="" alt="Thumbnail" class="media-thumb">
+          <div id="platform-badge" class="platform-badge"></div>
+        </div>
+        <div class="media-info">
+          <div id="media-title" class="media-title"></div>
+          <div id="media-meta" class="media-meta"></div>
+          <div class="format-row">
+            <div class="format-group">
+              <label class="format-label">Format</label>
+              <div class="toggle-group" id="format-toggle">
+                <button type="button" class="toggle-btn active" data-value="audio">MP3 Audio</button>
+                <button type="button" class="toggle-btn" data-value="video">MP4 Video</button>
+              </div>
+            </div>
+            <div class="format-group hidden" id="quality-group">
+              <label class="format-label">Quality</label>
+              <select id="quality-select" class="quality-select">
+                <option value="1080">1080p HD</option>
+                <option value="720" selected>720p</option>
+                <option value="480">480p</option>
+                <option value="360">360p</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" id="social-download-btn" class="download-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download
+          </button>
+        </div>
+      </div>
+
+      <div id="progress-wrap" class="progress-wrap hidden">
+        <div class="progress-label">
+          <span id="progress-status">Starting…</span>
+          <span id="progress-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="progress-bar" class="progress-bar" style="width:0%"></div>
+        </div>
+        <div id="progress-meta" class="progress-meta"></div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>MediaSaver &mdash; Ad-Free Downloader for Spotify, YouTube, Twitter/X &amp; TikTok.</p>
+    </footer>
+  </div>
+
+  <audio id="audio-player"></audio>
+  <script src="app.js"></script>
+</body>
+
+</html>

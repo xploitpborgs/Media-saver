@@ -1,0 +1,27 @@
+{
+  "name": "mediasaver",
+  "version": "1.0.0",
+  "description": "Ad-free multi-platform media downloader for Spotify (tracks, playlists, albums), YouTube, Twitter/X, and TikTok.",
+  "main": "src/api.js",
+  "bin": {
+    "mediasaver": "bin/mediasaver"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "cli": "node src/cli.js"
+  },
+  "keywords": [
+    "spotify",
+    "youtube",
+    "twitter",
+    "tiktok",
+    "downloader",
+    "mp3",
+    "mp4"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
