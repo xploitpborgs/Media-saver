@@ -29,6 +29,7 @@ const progressMeta = document.getElementById('progress-meta');
 let activeTab = 'spotify';
 let currentPlayingBtn = null;
 let currentTracks = [];
+let currentCollectionTitle = 'Spotify Collection';
 let selectedFormat = 'audio';
 let currentSocialUrl = '';
 let pollTimer = null;
@@ -241,6 +242,7 @@ function renderSpotifyResults(data) {
   const typeLabel = (data.type || 'track').toUpperCase();
 
   if (data.meta && (data.type === 'album' || data.type === 'playlist')) {
+    currentCollectionTitle = data.meta.title || 'Spotify Collection';
     collectionHeader.classList.remove('hidden');
     collectionHeader.innerHTML = `
       <div class="collection-left">
@@ -251,9 +253,10 @@ function renderSpotifyResults(data) {
           <p>${escapeHtml(data.meta.artist || 'Collection')} &bull; ${items.length} Tracks</p>
         </div>
       </div>
-      <button type="button" id="dl-all-btn" class="dl-all-btn">&#10515; Download All (${items.length})</button>
+      <button type="button" id="dl-all-btn" class="dl-all-btn">&#10515; Download All ZIP (${items.length})</button>
     `;
   } else {
+    currentCollectionTitle = 'Spotify Collection';
     collectionHeader.classList.add('hidden');
   }
 
@@ -375,40 +378,99 @@ function attachSpotifyListeners() {
   const dlAllBtn = document.getElementById('dl-all-btn');
   if (dlAllBtn) {
     dlAllBtn.addEventListener('click', async () => {
-      if (batchRunning) return;
+      if (batchRunning || !currentTracks.length) return;
       batchRunning = true;
       dlAllBtn.disabled = true;
+      dlAllBtn.textContent = 'Preparing ZIP…';
+      setStatus('');
 
-      const dlButtons = Array.from(document.querySelectorAll('.dl-btn'));
-      let failed = 0;
+      progressWrap.classList.remove('hidden');
+      progressStatus.textContent = `Starting batch download (0/${currentTracks.length})…`;
+      progressPct.textContent = '0%';
+      progressBar.style.width = '0%';
+      progressMeta.textContent = 'Converting tracks & packaging ZIP archive…';
 
-      for (let i = 0; i < currentTracks.length; i++) {
-        if (!batchRunning) break;
-        const track = currentTracks[i];
-        const btn = dlButtons[i];
-        dlAllBtn.textContent = `Downloading ${i + 1}/${currentTracks.length}…`;
-        setStatus(`Converting (${i + 1}/${currentTracks.length}): ${track.artist} - ${track.title}`);
+      try {
+        const res = await fetch('/api/download-zip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: currentCollectionTitle,
+            items: currentTracks
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.jobId) throw new Error(data.error || 'Failed to start ZIP download');
 
-        try {
-          await convertAndDownloadTrack(track, btn);
-          await new Promise(r => setTimeout(r, 800));
-        } catch (err) {
-          failed++;
-          console.error(`Track ${i + 1} failed:`, err);
-        }
+        pollZipJob(data.jobId, dlAllBtn);
+      } catch (err) {
+        batchRunning = false;
+        dlAllBtn.disabled = false;
+        dlAllBtn.innerHTML = `&#10515; Download All ZIP (${currentTracks.length})`;
+        progressStatus.textContent = 'Error';
+        setStatus(`Batch download failed: ${err.message}`, true);
       }
-
-      batchRunning = false;
-      dlAllBtn.disabled = false;
-      dlAllBtn.innerHTML = `&#10515; Download All (${currentTracks.length})`;
-      setStatus(
-        failed > 0
-          ? `Batch finished with ${failed} error(s).`
-          : `All ${currentTracks.length} track(s) started downloading!`,
-        failed > 0
-      );
     });
   }
+}
+
+function pollZipJob(jobId, dlAllBtn) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/status/${encodeURIComponent(jobId)}`);
+      const data = await res.json();
+
+      if (data.progress) {
+        const pct = Math.min(100, Math.round(data.progress.percent || 0));
+        const cur = data.progress.current || 0;
+        const tot = data.progress.total || currentTracks.length;
+        progressPct.textContent = `${pct}%`;
+        progressBar.style.width = `${pct}%`;
+
+        if (data.status === 'processing') {
+          progressStatus.textContent = 'Packaging ZIP archive…';
+          dlAllBtn.textContent = 'Zipping…';
+        } else {
+          progressStatus.textContent = `Converting (${cur}/${tot})…`;
+          dlAllBtn.textContent = `Converting ${cur}/${tot}…`;
+        }
+        progressMeta.textContent = data.progress.currentTrack || '';
+      }
+
+      if (data.status === 'done' && data.result) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        batchRunning = false;
+        dlAllBtn.disabled = false;
+        dlAllBtn.innerHTML = `&#10515; Download All ZIP (${currentTracks.length})`;
+
+        const sizeMb = (data.result.size / (1024 * 1024)).toFixed(2);
+        const failNote = data.result.failed ? ` (${data.result.failed} skipped)` : '';
+        progressPct.textContent = '100%';
+        progressBar.style.width = '100%';
+        progressStatus.textContent = `Ready: ${data.result.filename}`;
+        progressMeta.textContent = `${data.result.downloaded} track(s) • ${sizeMb} MB${failNote}`;
+
+        triggerDownload(data.result.downloadUrl, data.result.filename);
+      } else if (data.status === 'error') {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        batchRunning = false;
+        dlAllBtn.disabled = false;
+        dlAllBtn.innerHTML = `&#10515; Download All ZIP (${currentTracks.length})`;
+        progressStatus.textContent = 'Error';
+        setStatus(`Batch download failed: ${data.error}`, true);
+      }
+    } catch (err) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      batchRunning = false;
+      dlAllBtn.disabled = false;
+      dlAllBtn.innerHTML = `&#10515; Download All ZIP (${currentTracks.length})`;
+      setStatus(`Polling error: ${err.message}`, true);
+    }
+  }, 700);
 }
 
 // ── Social Media Card & Job Polling ─────────────────────────────────

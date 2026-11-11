@@ -3,11 +3,12 @@ const fs = require('fs');
 const path = require('path');
 const api = require('./api');
 const downloader = require('./downloader');
-const { detectPlatform, getInfo, download, PLATFORMS, DOWNLOADS_DIR } = require('./ytdlp');
+const zip = require('./zip');
+const { detectPlatform, getInfo, download, sanitizeFilename, PLATFORMS, DOWNLOADS_DIR } = require('./ytdlp');
 
 const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 3333;
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
-const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const JOB_TTL_MS = 60 * 60 * 1000;
 
 const MIME_TYPES = {
@@ -17,6 +18,7 @@ const MIME_TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.mp3': 'audio/mpeg',
   '.mp4': 'video/mp4',
+  '.zip': 'application/zip',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml'
@@ -101,6 +103,92 @@ const server = http.createServer(async (req, res) => {
         size: result.bytes,
         downloadUrl: `/downloads/${encodeURIComponent(result.filename)}`
       });
+    }
+
+    // ── Spotify Album / Playlist Batch ZIP Job ──────────────────────
+    if (pathname === '/api/download-zip' && req.method === 'POST') {
+      pruneOldJobs();
+      const body = await parseBody(req);
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (items.length === 0) {
+        return sendJson(res, 400, { error: 'Track items array is required' });
+      }
+
+      const collectionTitle = sanitizeFilename(body.title || 'Spotify Collection');
+      const jobId = `zip_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const job = {
+        id: jobId,
+        platform: 'spotify',
+        status: 'downloading',
+        progress: { percent: 0, current: 0, total: items.length, failed: 0, currentTrack: '' },
+        result: null,
+        error: null,
+        createdAt: Date.now()
+      };
+      jobs.set(jobId, job);
+
+      (async () => {
+        const downloadedEntries = new Array(items.length);
+        let completed = 0;
+        let failed = 0;
+        let cursor = 0;
+        const CONCURRENCY = Math.min(3, items.length);
+
+        async function worker() {
+          while (cursor < items.length) {
+            const idx = cursor++;
+            const track = items[idx];
+            job.progress.currentTrack = `${track.artist || ''} - ${track.title || ''}`.trim();
+            try {
+              const resTrack = await downloader.downloadTrack(track, DOWNLOADS_DIR);
+              downloadedEntries[idx] = {
+                filePath: resTrack.filePath,
+                entryName: resTrack.filename
+              };
+            } catch (err) {
+              failed++;
+              job.progress.failed = failed;
+              console.warn(`[ZIP Batch] Track failed (${track.title}):`, err.message);
+            }
+            completed++;
+            job.progress.current = completed;
+            job.progress.percent = Math.round((completed / items.length) * 90);
+          }
+        }
+
+        await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+
+        const validEntries = downloadedEntries.filter(Boolean);
+        if (validEntries.length === 0) {
+          job.status = 'error';
+          job.error = 'Failed to convert any tracks in this collection';
+          return;
+        }
+
+        job.status = 'processing';
+        job.progress.percent = 95;
+        job.progress.currentTrack = 'Creating ZIP archive…';
+
+        const zipFilename = `${collectionTitle}.zip`;
+        const zipPath = path.join(DOWNLOADS_DIR, zipFilename);
+        const zipInfo = zip.createZipFromFiles(validEntries, zipPath);
+
+        job.status = 'done';
+        job.progress.percent = 100;
+        job.result = {
+          title: collectionTitle,
+          filename: zipFilename,
+          format: 'zip',
+          size: zipInfo.size,
+          downloaded: validEntries.length,
+          failed
+        };
+      })().catch(err => {
+        job.status = 'error';
+        job.error = err.message;
+      });
+
+      return sendJson(res, 202, { jobId, status: 'downloading', total: items.length });
     }
 
     // ── Social API: Extract metadata without downloading ────────────
@@ -188,6 +276,8 @@ const server = http.createServer(async (req, res) => {
           filename: job.result.filename,
           format: job.result.format,
           size: job.result.size,
+          downloaded: job.result.downloaded,
+          failed: job.result.failed,
           downloadUrl: `/downloads/${encodeURIComponent(job.result.filename)}`
         };
       }

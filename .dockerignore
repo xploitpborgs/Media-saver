@@ -1,0 +1,12 @@
+.git
+.gitignore
+node_modules
+downloads/*.mp3
+downloads/*.mp4
+downloads/*.zip
+downloads/*.m4a
+downloads/*.webm
+downloads/*.part
+*.log
+.DS_Store
+Thumbs.db

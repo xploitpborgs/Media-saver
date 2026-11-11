@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: mediasaver
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/platforms
+    envVars:
+      - key: PORT
+        value: 3333

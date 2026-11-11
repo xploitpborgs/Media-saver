@@ -5,10 +5,14 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const socialApi = require('./socialApi');
 
 const YTDLP = 'yt-dlp';
-const DOWNLOADS_DIR = path.resolve(__dirname, '..', 'downloads');
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const DOWNLOADS_DIR = IS_SERVERLESS
+  ? path.join(os.tmpdir(), 'mediasaver-downloads')
+  : path.resolve(__dirname, '..', 'downloads');
 
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 
@@ -48,6 +52,8 @@ function extractYtdlpError(stderr) {
 function getInfoYtdlp(url) {
   return new Promise((resolve, reject) => {
     const args = [
+      '--js-runtimes', 'node',
+      '--remote-components', 'ejs:github',
       '--dump-single-json',
       '--no-download',
       '--no-playlist',
@@ -157,6 +163,8 @@ function downloadAudioSearch(searchQuery, safeBaseName, outputDir = DOWNLOADS_DI
     const outTemplate = path.join(outputDir, `${tmpName}.%(ext)s`);
 
     const args = [
+      '--js-runtimes', 'node',
+      '--remote-components', 'ejs:github',
       '--no-playlist',
       '--format', 'bestaudio[ext=m4a]/bestaudio/best',
       '-x',
@@ -213,6 +221,8 @@ function downloadYtdlp(url, format = 'audio', quality = '720', onProgress) {
     const outTemplate = path.join(DOWNLOADS_DIR, `${tmpName}.%(ext)s`);
 
     const args = [
+      '--js-runtimes', 'node',
+      '--remote-components', 'ejs:github',
       '--no-playlist',
       '--no-simulate',
       '--print', 'before_dl:__META__:%(uploader)s\t%(title)s',

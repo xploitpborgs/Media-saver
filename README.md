@@ -43,6 +43,21 @@ All downloaded files are saved to `downloads/`.
 
 ---
 
+## Deploy Online (Docker: Railway / Render / Fly.io)
+
+Vercel Serverless Functions do not include `yt-dlp` or `ffmpeg` binaries. Use the included [Dockerfile](Dockerfile) to host all 4 platforms cleanly:
+
+- **Render:** Create a new **Blueprint** or **Web Service** from this GitHub repo — [render.yaml](render.yaml) auto-configures the Docker build and `/api/platforms` health check.
+- **Railway:** Create a **New Project → Deploy from GitHub Repo** — Railway automatically builds `Dockerfile` with `node`, `yt-dlp`, and `ffmpeg`.
+- **Fly.io:** Run `fly launch` in the project directory (uses `Dockerfile` automatically on port `3333`).
+- **Local Docker:**
+  ```bash
+  docker build -t mediasaver .
+  docker run -p 3333:3333 mediasaver
+  ```
+
+---
+
 ## Project Structure
 
 ```
